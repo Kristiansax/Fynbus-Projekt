@@ -22,6 +22,8 @@ namespace DataAccess
             listOfOffers = new List<Offer>();
             encoding = Encoding.GetEncoding("iso-8859-1");
         }
+
+        //Try parsing string to int by replacing all spaces with nothing
         public int TryParseToIntElseZero(string toParse)
         {
             int number;
@@ -29,6 +31,8 @@ namespace DataAccess
             bool tryParse = Int32.TryParse(toParse, out number);
             return number;
         }
+
+        //Try parsing string to float by replacing all spaces with nothing
         public float TryParseToFloatElseZero(string toParse)
         {
             string CurrentCultureName = Thread.CurrentThread.CurrentCulture.Name;
