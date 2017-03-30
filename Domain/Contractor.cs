@@ -55,6 +55,7 @@ namespace Domain
             this.NumberOfType7PledgedVehicles = numberOfType7PledgedVehicles;
         }
 
+        // Adds won offer to winningOffers List as long as its not already there
         public void AddWonOffer(Offer offer)
         {
             bool alreadyOnTheList = winningOffers.Any(item => item.OfferReferenceNumber == offer.OfferReferenceNumber);
@@ -75,6 +76,8 @@ namespace Domain
             }
          
         }
+
+        // Adds ineligible offers to InEligibleOffersToReturn List and returns it
         public List<Offer> ReturnIneligibleOffers()
         {
             List<Offer> InEligibleOffersToReturn = new List<Offer>();
@@ -87,6 +90,8 @@ namespace Domain
             }
             return InEligibleOffersToReturn;
         }
+
+        // Loops through winningOffers and adds all ineligble offers to tobeRemoved List and if there are any, loops through the list again and removes them
         public void RemoveIneligibleOffersFromWinningOffers()
         {
             List<Offer> toBeRemoved = new List<Offer>();
@@ -105,7 +110,9 @@ namespace Domain
                     winningOffers.Remove(offer);
                 }
             }
-        }         
+        }
+
+        // Runs through winning offers to check if all the required vehicles are available, if not add it to offersWithConflict
         public List<Offer> CompareNumberOfWonOffersAgainstVehicles()
         {
             List<Offer> offersWithConflict = new List<Offer>();
@@ -176,6 +183,10 @@ namespace Domain
 
             return offersWithConflict;
         }
+
+        // Checks each offer in winningOffers and add eligible offers with correct vehicle type to offers to checks
+        // Makes offers ineligible if the contractor doesn't have enough vehicles
+        // Calls FindOptimalWins with the remaining offers, adds them to listOfOffersToReturn and returns it
         private List<Offer> IfTooManyWonOffers(int numberOfPledgedVehicles, int numberOfWonOffersWithThisType, int type)
         {
             List<Offer> offersToCheck = new List<Offer>();
@@ -209,6 +220,11 @@ namespace Domain
 
             return listOfOffersToReturn;
         }
+
+        // Checks if all offers in offersToChooseFrom are eligible
+        // Puts all eligible offers from offersToChooseFrom into eligibleOffers
+        // Checks if contractor has enough vehicles for eligibleOffers, if not then makes all offers that aren't the contractors priority ineligible
+        // If they do, return an empty list (?)
         private List<Offer> FindOptimalWins(List<Offer> offersToCheck, int numberOfPledgedVehicles)
         {
             List<Offer> offersWithConflict = new List<Offer>();
@@ -266,6 +282,8 @@ namespace Domain
             }
             return offersWithConflict;
         }
+
+        // Loops thorugh the offers and counts the amount of won vehicles of each type
         public void CountNumberOfWonOffersOfEachType(List<Offer> outPutList)
         {
             NumberOfWonType2Offers = 0;
