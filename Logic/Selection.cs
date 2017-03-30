@@ -1,176 +1,255 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Domain;
 using System.Diagnostics;
 
 namespace Logic
-{ 
+{
     /// <summary>
-    /// Selectioncontroller is used to 
+    /// This class is used to find the winners of each routeNumber at a time.
+    /// It is a 'helper-class' for SelectionController and methods in Selection are only called from SelectionController.
     /// </summary>
-    public class SelectionController
-    {       
-        public List<RouteNumber> routeNumberList;
-        public Selection selection;
-        public List<RouteNumber> sortedRouteNumberList;
+    public class Selection
+    {
         ListContainer listContainer = ListContainer.GetInstance();
-        
-        public SelectionController()
-        {
-            routeNumberList = new List<RouteNumber>();
-            selection = new Selection();
-        }
 
         /// <summary>
-        /// 1. Sorts routeNumbers by ID
-        /// 2. Sorts offers of each routeNumber by OperationPrice
+        /// This method takes a list of sorted route numbers.
+        /// Each route number has its offers sorted by operationPrice.
         /// </summary>
-        private void SortRouteNumberList(List<RouteNumber> routeNumberList)
+        public void CalculateOperationPriceDifferenceForOffers(List<RouteNumber> sortedRouteNumberList)
         {
-            sortedRouteNumberList = routeNumberList.OrderBy(x => x.RouteID).ToList();
-
+            const int LAST_OPTION_VALUE = int.MaxValue;
             foreach (RouteNumber routeNumber in sortedRouteNumberList)
             {
-                routeNumber.offers = routeNumber.offers.OrderBy(x => x.OperationPrice).ThenBy(x => x.RouteNumberPriority).ToList();
+                int numbersToCalc = (routeNumber.offers.Count()) - 1;
 
-                ///////////////////// Tracing //////////////////////////
-                Trace.WriteLine($"\nOffers for route-number {routeNumber.RouteID} are now sorted");
-
-                int index = 0;
-                foreach (Offer o in routeNumber.offers)
+                // No bids = throw exception
+                if (routeNumber.offers.Count == 0)
                 {
-                    Trace.Indent();
+                    throw new Exception("Der er ingen bud på garantivognsnummer " + routeNumber.RouteID);
+                }
 
-                    if (index == 0)
+                // If only one bid
+                else if (routeNumber.offers.Count == 1)
+                {
+                    routeNumber.offers[0].DifferenceToNextOffer = LAST_OPTION_VALUE;
+                }
+
+                // If exectly two bids
+                else if (routeNumber.offers.Count == 2)
+                {
+
+                    // If bids are at same price, both DifferenceToNextOffer are set to max
+                    if (routeNumber.offers[0].OperationPrice == routeNumber.offers[1].OperationPrice)
                     {
-                        Trace.WriteLine($"Offer from company '{o.Contractor.CompanyName}' at price {o.OperationPrice}kr per hour (WINNER)");
+                        routeNumber.offers[0].DifferenceToNextOffer = LAST_OPTION_VALUE;
+                        routeNumber.offers[1].DifferenceToNextOffer = LAST_OPTION_VALUE;
                     }
+
+                    // The lowest priced offer (at index 0) has its property DifferenceToNextOffer set to the actual difference
                     else
                     {
-                        Trace.WriteLine($"Offer from company '{o.Contractor.CompanyName}' at price {o.OperationPrice}kr per hour");
+                        routeNumber.offers[0].DifferenceToNextOffer = routeNumber.offers[1].OperationPrice - routeNumber.offers[0].OperationPrice;
+                        routeNumber.offers[1].DifferenceToNextOffer = LAST_OPTION_VALUE;
                     }
-                    
-                    Trace.Unindent();
-
-                    index++;
                 }
-                //////////////////// Tracing end //////////////////////
-            }
 
+                // More than two offers
+                // Each offer has its DifferenceToNextOffer set to correct difference, while the last last offer has its difference set to LAST_OPTION_VALUE
+                else
+                {
+                    for (int i = 0; i < numbersToCalc; i++)
+                    {
+                        float difference = 0;
+                        int j = i + 1;
+                        if (routeNumber.offers[i].OperationPrice != routeNumber.offers[numbersToCalc].OperationPrice)
+                        {
+                            while (difference == 0 && j <= numbersToCalc)
+                            {
+                                difference = routeNumber.offers[j].OperationPrice - routeNumber.offers[i].OperationPrice;
+                                j++;
+                            }
+                        }
+                        else
+                        {
+                            while (i < numbersToCalc)
+                            {
+                                routeNumber.offers[i].DifferenceToNextOffer = LAST_OPTION_VALUE;
+                                i++;
+                            }
+                        }
+                        routeNumber.offers[i].DifferenceToNextOffer = difference;
+                    }
+
+                    // Last item here
+                    routeNumber.offers[numbersToCalc].DifferenceToNextOffer = LAST_OPTION_VALUE;
+                }
+            }
         }
 
         /// <summary>
-        /// Uses methods from Selection-class to find winners.
+        /// Name of method is self explanatory.
+        /// Read more comments inside method.
         /// </summary>
-        public void SelectWinners()
+        public void CheckIfContractorHasWonTooManyRouteNumbers(List<Offer> offersToCheck, List<RouteNumber> sortedRouteNumberList)
         {
-            routeNumberList = listContainer.routeNumberList;
-            SortRouteNumberList(routeNumberList);
+            List<Contractor> contractorsToCheck = new List<Contractor>();
 
-            List<Offer> offersToAssign = new List<Offer>();
-
-            selection.CalculateOperationPriceDifferenceForOffers(sortedRouteNumberList);
-            int lengthOfSortedRouteNumberList = sortedRouteNumberList.Count();
-            for (int i = 0; i < lengthOfSortedRouteNumberList; i++)
+            // For each offer it loops through all contractors.
+            // If contractors id matches offers id, the contractor is added to contractorsToCheck:List
+            foreach (Offer offer in offersToCheck)
             {
-                List<Offer> toAddToAssign = selection.FindWinner(sortedRouteNumberList[i]);
-                foreach (Offer offer in toAddToAssign)
+                foreach (Contractor contractor in listContainer.contractorList)
                 {
-                    offersToAssign.Add(offer);
+                    if (contractor.UserID.Equals(offer.UserID))
+                    {
+                        bool alreadyOnList = contractorsToCheck.Any(obj => obj.UserID.Equals(contractor.UserID));
+                        if (!alreadyOnList)
+                        {
+                            contractorsToCheck.Add(contractor);
+                        }
+                    }
                 }
             }
-            List<Offer> offersThatAreIneligible = selection.AssignWinners(offersToAssign, sortedRouteNumberList);
 
-            bool allRouteNumberHaveWinner = DoAllRouteNumbersHaveWinner(offersThatAreIneligible);
-            if (allRouteNumberHaveWinner)
+            // Loops through contractors to see if they won more viechles than their amount of cars
+            foreach (Contractor contractor in contractorsToCheck)
             {
-                selection.CheckIfContractorHasWonTooManyRouteNumbers(CreateWinnerList(), sortedRouteNumberList);
-                selection.CheckForMultipleWinnersForEachRouteNumber(CreateWinnerList());
-                List<Offer> winningOffers = CreateWinnerList();
-                foreach (Offer offer in winningOffers)
+                List<Offer> offers = contractor.CompareNumberOfWonOffersAgainstVehicles();
+                if (offers.Count > 0 && offers != null)
                 {
-                    listContainer.outputList.Add(offer);
+                    foreach (Offer offer in contractor.CompareNumberOfWonOffersAgainstVehicles())
+                    {
+                        // Dont think this bool is every used.
+                        // Maybe it should have been used (like above) to only add offers to conflictlist of they are not already added
+                        bool alreadyOnList = listContainer.conflictList.Any(item => item.OfferReferenceNumber == offer.OfferReferenceNumber);
+
+                        listContainer.conflictList.Add(offer);
+                    }
+                    throw new Exception("Denne entreprenør har vundet flere garantivognsnumre, end de har biler til.  Der kan ikke vælges imellem dem, da de har samme prisforskel ned til næste bud. Prioriter venligst buddene i den relevante fil i kolonnen Entreprenør Prioritet");
                 }
             }
-            // If not all routes have found winners yet
+        }
+
+        /// <summary>
+        /// Returns a list of offer (sorted) from a given routeNumber
+        /// </summary>
+        public List<Offer> FindWinner(RouteNumber routeNumber)
+        {
+            List<Offer> winningOffers = new List<Offer>();
+            List<Offer> listOfOffersWithLowestPrice = new List<Offer>();
+            int lengthOfOffers = routeNumber.offers.Count();
+            float lowestEligibleOperationPrice = 0;
+            bool cheapestNotFound = true;
+
+            for (int i = 0; i < lengthOfOffers; i++)
+            {
+                if (routeNumber.offers[i].IsEligible && cheapestNotFound)
+                {
+                    lowestEligibleOperationPrice = routeNumber.offers[i].OperationPrice;
+                    cheapestNotFound = false;
+                }
+            }
+
+            foreach (Offer offer in routeNumber.offers)
+            {
+                if (offer.IsEligible && offer.OperationPrice == lowestEligibleOperationPrice)
+                {
+                    listOfOffersWithLowestPrice.Add(offer);
+                }
+            }
+
+            int count = 0;
+            foreach (Offer offer in listOfOffersWithLowestPrice) // Checking if offers with same price are prioritized
+            {
+                if (offer.RouteNumberPriority != 0)
+                {
+                    count++;
+                }
+            }
+            if (count != 0) //if routenumberpriority found 
+
+            {
+                List<Offer> listOfPriotizedOffers = new List<Offer>();
+                foreach (Offer offer in listOfOffersWithLowestPrice)
+                {
+                    if (offer.RouteNumberPriority > 0)
+                    {
+                        listOfPriotizedOffers.Add(offer);
+                    }
+                }
+
+                listOfPriotizedOffers = listOfPriotizedOffers.OrderBy(x => x.RouteNumberPriority).ToList();
+                winningOffers.Add(listOfPriotizedOffers[0]);
+            }
             else
             {
-                ContinueUntilAllRouteNumbersHaveWinner(offersThatAreIneligible);
+                foreach (Offer offer in listOfOffersWithLowestPrice)
+                {
+                    winningOffers.Add(offer);
+                }
             }
+
+            return winningOffers;
         }
 
         /// <summary>
         /// 
         /// </summary>
-        private void ContinueUntilAllRouteNumbersHaveWinner(List<Offer> offersThatAreIneligible)
+        public List<Offer> AssignWinners(List<Offer> offersToAssign, List<RouteNumber> sortedRouteNumberList) // sortedRouteNumberList NOT USED!
         {
-            List<Offer> offersThatHaveBeenMarkedIneligible = offersThatAreIneligible;
-            List<Offer> offersToAssign = new List<Offer>();
+            List<Offer> offersThatHaveBeenMarkedIneligible = new List<Offer>(); // NOT USED!
+            List<Contractor> contractorsToCheck            = new List<Contractor>();
+            List<Offer> ineligibleOffersAllContractors     = new List<Offer>();
 
-            foreach (Offer offer in offersThatHaveBeenMarkedIneligible)
+            foreach (Offer offer in offersToAssign)
             {
-                foreach (RouteNumber routeNumber in sortedRouteNumberList)
+                if (offer.IsEligible)
                 {
-                    if (routeNumber.RouteID == offer.RouteID)
+                    listContainer.contractorList.Find(x => x.UserID == offer.UserID).AddWonOffer(offer);
+                    contractorsToCheck.Add(offer.Contractor);
+                }
+            }
+
+            int lengthOfContractorList = contractorsToCheck.Count();
+            for (int i = 0; i < lengthOfContractorList; i++)
+            {
+                contractorsToCheck[i].CompareNumberOfWonOffersAgainstVehicles();
+                List<Offer> ineligibleOffersOneContractor = contractorsToCheck[i].ReturnIneligibleOffers();
+                ineligibleOffersAllContractors.AddRange(ineligibleOffersOneContractor);
+                contractorsToCheck[i].RemoveIneligibleOffersFromWinningOffers();
+            }
+            
+            return ineligibleOffersAllContractors;
+        }
+
+        /// <summary>
+        /// Does what is says. It checks wether a route numbers has multiple winners.
+        /// The program cannot decide which offer to win, if they are at same price.
+        /// It then asks the user of the program to go and prioritize an offer.
+        /// </summary>
+        public void CheckForMultipleWinnersForEachRouteNumber(List<Offer> winnerList)
+        {
+            int length = winnerList.Count;
+            for (int i = 0; i < length; i++)
+            {
+                for (int j = i + 1; j < length; j++)
+                {
+                    if (winnerList[i].RouteID == winnerList[j].RouteID)
                     {
-                        List<Offer> offersToAssignToContractor = selection.FindWinner(routeNumber);
-                        foreach (Offer ofr in offersToAssignToContractor)
+                        foreach (Offer offer in winnerList)
                         {
-                            offersToAssign.Add(ofr);
+                            if (offer.RouteID == winnerList[i].RouteID)
+                            {
+                                listContainer.conflictList.Add(offer);
+                            }
                         }
+                        throw new Exception("Dette garantivognsnummer har flere mulige vindere. Der kan ikke vælges mellem dem, da de har samme prisforskel ned til næste bud. Prioriter venligst buddene i den relevante fil i kolonnen Garantivognsnummer Prioritet.");
                     }
                 }
-            }
-            offersThatHaveBeenMarkedIneligible = selection.AssignWinners(offersToAssign, sortedRouteNumberList);
-            bool allRouteNumberHaveWinner = DoAllRouteNumbersHaveWinner(offersThatHaveBeenMarkedIneligible);
-            if (allRouteNumberHaveWinner)
-            {
-                selection.CheckIfContractorHasWonTooManyRouteNumbers(CreateWinnerList(), sortedRouteNumberList);
-                selection.CheckForMultipleWinnersForEachRouteNumber(CreateWinnerList());
-                foreach (Offer offer in CreateWinnerList())
-                {
-                    listContainer.outputList.Add(offer);
-                }
-            } // Sidste punkt
-            else
-            {                
-                ContinueUntilAllRouteNumbersHaveWinner(offersThatHaveBeenMarkedIneligible);
-            }
-        }
-
-        /// <summary>
-        /// 1. Loops through all contractors to find all winning offers
-        /// 2. Return a big list of all winning offers
-        /// </summary>
-        public List<Offer> CreateWinnerList()
-        {
-            List<Offer> winningOffers = new List<Offer>();
-
-            foreach (Contractor c in listContainer.contractorList)
-            {
-                foreach (Offer o in c.winningOffers)
-                {
-                    winningOffers.Add(o);
-                }
-            }
-            return winningOffers;
-        }
-
-        /// <summary>
-        /// Basically just checks if the list of offers is empty or not.
-        /// So if no offers are ineligible = all routes has winners
-        /// </summary>
-        private bool DoAllRouteNumbersHaveWinner(List<Offer> offersThatAreIneligible)
-        {
-            if (offersThatAreIneligible.Count == 0)
-            {
-                return true;
-            }
-            else
-            {
-                return false;
             }
         }
     }
 }
-
