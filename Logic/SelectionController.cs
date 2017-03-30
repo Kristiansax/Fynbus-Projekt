@@ -1,9 +1,10 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using Domain;
+using System.Diagnostics;
 
 namespace Logic
-{
+{ 
     public class SelectionController
     {       
         public List<RouteNumber> routeNumberList;
@@ -17,18 +18,52 @@ namespace Logic
             selection = new Selection();
         }
 
+        /// <summary>
+        /// 1. Sorts routeNumbers by ID
+        /// 2. Sorts offers of each routeNumber by OperationPrice
+        /// </summary>
         private void SortRouteNumberList(List<RouteNumber> routeNumberList)
         {
             sortedRouteNumberList = routeNumberList.OrderBy(x => x.RouteID).ToList();
+
             foreach (RouteNumber routeNumber in sortedRouteNumberList)
             {
                 routeNumber.offers = routeNumber.offers.OrderBy(x => x.OperationPrice).ThenBy(x => x.RouteNumberPriority).ToList();
+
+                ///////////////////// Tracing //////////////////////////
+                Trace.WriteLine($"\nOffers for route-number {routeNumber.RouteID} are now sorted");
+
+                int index = 0;
+                foreach (Offer o in routeNumber.offers)
+                {
+                    Trace.Indent();
+
+                    if (index == 0)
+                    {
+                        Trace.WriteLine($"Offer from company '{o.Contractor.CompanyName}' at price {o.OperationPrice}kr per hour (WINNER)");
+                    }
+                    else
+                    {
+                        Trace.WriteLine($"Offer from company '{o.Contractor.CompanyName}' at price {o.OperationPrice}kr per hour");
+                    }
+                    
+                    Trace.Unindent();
+
+                    index++;
+                }
+                //////////////////// Tracing end //////////////////////
             }
+
         }
+
+        /// <summary>
+        /// Uses methods from Selection-class to find winners.
+        /// </summary>
         public void SelectWinners()
         {
             routeNumberList = listContainer.routeNumberList;
             SortRouteNumberList(routeNumberList);
+
             List<Offer> offersToAssign = new List<Offer>();
 
             selection.CalculateOperationPriceDifferenceForOffers(sortedRouteNumberList);
@@ -54,11 +89,16 @@ namespace Logic
                     listContainer.outputList.Add(offer);
                 }
             }
+            // If not all routes have found winners yet
             else
             {
                 ContinueUntilAllRouteNumbersHaveWinner(offersThatAreIneligible);
             }
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
         private void ContinueUntilAllRouteNumbersHaveWinner(List<Offer> offersThatAreIneligible)
         {
             List<Offer> offersThatHaveBeenMarkedIneligible = offersThatAreIneligible;
@@ -94,6 +134,11 @@ namespace Logic
                 ContinueUntilAllRouteNumbersHaveWinner(offersThatHaveBeenMarkedIneligible);
             }
         }
+
+        /// <summary>
+        /// 1. Loops through all contractors to find all winning offers
+        /// 2. Return a big list of all winning offers
+        /// </summary>
         public List<Offer> CreateWinnerList()
         {
             List<Offer> winningOffers = new List<Offer>();
@@ -107,6 +152,11 @@ namespace Logic
             }
             return winningOffers;
         }
+
+        /// <summary>
+        /// Basically just checks if the list of offers is empty or not.
+        /// So if no offers are ineligible = all routes has winners
+        /// </summary>
         private bool DoAllRouteNumbersHaveWinner(List<Offer> offersThatAreIneligible)
         {
             if (offersThatAreIneligible.Count == 0)
