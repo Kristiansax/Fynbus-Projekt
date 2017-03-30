@@ -27,6 +27,12 @@ namespace View
         {
             txtBoxFilePathRouteNumberOffer.Text = mainWindowViewModel.ChooseCSVFile();
         }
+        
+        /// <summary>
+        /// If one or both of the textboxes are empty, it will give you a message box that tells you to import the remaining file(s).
+        /// If both textboxes have something in them, it will try to import the files. 
+        /// If the import is succesfull, it will tell you so, and then ready the data for sorting/calculation.
+        /// </summary>
         private void BtnImport_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -52,6 +58,11 @@ namespace View
             }
 
         }
+        
+        /// <summary>
+        /// When "Udvælgelse" is clicked, the SelectionController adds the winners to our outputlist.
+        /// We then sort the outputlist and counts the amount of won offers, and then shows them sorted by user id.
+        /// </summary>
         private void BtnStartSelection_Click(object sender, RoutedEventArgs e)
         {
             try
