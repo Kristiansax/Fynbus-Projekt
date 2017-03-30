@@ -48,6 +48,8 @@ namespace DataAccess
             bool tryParse = float.TryParse(toParse.Replace('.', ','), out number);
             return number;
         }
+
+        //Takes a file path, imports and splits the information in the file and adds it to a list of offers
         public void ImportOffers(string filepath)
         {
             try
@@ -110,6 +112,8 @@ namespace DataAccess
                 throw new Exception("Fejl, filerne blev ikke importeret");
             }
         }
+
+        //Takes a file path, imports and splits the information in the file and adds it to a list of Routenumbers
         public void ImportRouteNumbers()
         {
             try
@@ -149,6 +153,8 @@ namespace DataAccess
                 throw new Exception("Fejl, filerne blev ikke importeret");
             }
         }
+
+        //Takes a file path, imports and splits the information in the file and adds it to a list of Contractors
         public void ImportContractors(string filepath)
         {
             try
